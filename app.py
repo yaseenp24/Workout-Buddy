@@ -3,7 +3,7 @@ from flask_cors import CORS
 from flask_jwt_extended import JWTManager, jwt_required, create_access_token, get_jwt_identity
 from models import db, User, Exercise, WorkoutTemplate, TemplateExercise, WorkoutLog, SetLog
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta 
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///fitness_tracker.db'
