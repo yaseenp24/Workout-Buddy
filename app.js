@@ -10,17 +10,30 @@ const API_BASE = 'http://localhost:5000/api';
 // Development flag to enable frontend-only fallbacks when backend is unavailable
 const IS_DEV = true;
 
-// Local storage helpers (development fallback)
-function getLocalWorkoutHistory() {
+// Local storage helpers (development fallback, per-account)
+function getLocalWorkoutHistoryMap() {
 	try {
-		return JSON.parse(localStorage.getItem('workoutHistory') || '[]');
+		return JSON.parse(localStorage.getItem('workoutHistoryByUser') || '{}');
 	} catch (e) {
-		return [];
+		return {};
 	}
 }
 
-function saveLocalWorkoutHistory(history) {
-	localStorage.setItem('workoutHistory', JSON.stringify(history));
+function saveLocalWorkoutHistoryMap(map) {
+	localStorage.setItem('workoutHistoryByUser', JSON.stringify(map));
+}
+
+function getLocalWorkoutHistory(email) {
+	if (!email) return [];
+	const map = getLocalWorkoutHistoryMap();
+	return map[email] || [];
+}
+
+function saveLocalWorkoutHistory(email, history) {
+	if (!email) return;
+	const map = getLocalWorkoutHistoryMap();
+	map[email] = history;
+	saveLocalWorkoutHistoryMap(map);
 }
 
 // Profile persistence helpers (per-account, keyed by email)
@@ -494,7 +507,8 @@ async function loadDashboardData() {
     try {
         // In development, always use locally saved workouts for dashboard stats
         if (IS_DEV) {
-            updateDashboardStats(getLocalWorkoutHistory());
+            const email = (currentUser && currentUser.email) || 'demo@local';
+            updateDashboardStats(getLocalWorkoutHistory(email));
             return;
         }
         const response = await fetch(`${API_BASE}/workouts/history?per_page=100`, {
@@ -778,9 +792,10 @@ async function finishWorkout() {
                 };
             })
         };
-        const history = getLocalWorkoutHistory();
+        const email = (currentUser && currentUser.email) || 'demo@local';
+        const history = getLocalWorkoutHistory(email);
         history.unshift(workout);
-        saveLocalWorkoutHistory(history);
+        saveLocalWorkoutHistory(email, history);
         
         showToast('Workout completed successfully! (Saved locally)', 'success');
         currentWorkout = null;
@@ -836,7 +851,8 @@ async function loadWorkoutHistory() {
     try {
         // In development, always load history from local storage
         if (IS_DEV) {
-            displayWorkoutHistory(getLocalWorkoutHistory());
+            const email = (currentUser && currentUser.email) || 'demo@local';
+            displayWorkoutHistory(getLocalWorkoutHistory(email));
             hideLoading();
             return;
         }
