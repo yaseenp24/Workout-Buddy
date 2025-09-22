@@ -23,14 +23,117 @@ function saveLocalWorkoutHistory(history) {
 	localStorage.setItem('workoutHistory', JSON.stringify(history));
 }
 
+// Profile persistence helpers (per-account, keyed by email)
+function getLocalUserProfiles() {
+	try {
+		return JSON.parse(localStorage.getItem('userProfiles') || '{}');
+	} catch (e) {
+		return {};
+	}
+}
+
+function saveLocalUserProfiles(profiles) {
+	localStorage.setItem('userProfiles', JSON.stringify(profiles));
+}
+
+function getLocalUserProfile(email) {
+	if (!email) return null;
+	const profiles = getLocalUserProfiles();
+	return profiles[email] || null;
+}
+
+function saveLocalUserProfile(email, profile) {
+	if (!email) return;
+	const profiles = getLocalUserProfiles();
+	profiles[email] = { ...(profiles[email] || {}), ...profile };
+	saveLocalUserProfiles(profiles);
+}
+
+// Utilities to normalize and prefill onboarding form
+function toArray(value) {
+	if (!value) return [];
+	if (Array.isArray(value)) return value;
+	try { const parsed = JSON.parse(value); return Array.isArray(parsed) ? parsed : []; } catch { return []; }
+}
+
+function getEffectiveProfile() {
+	const email = currentUser && currentUser.email;
+	const local = email ? getLocalUserProfile(email) : null;
+	return {
+		goals: toArray(local?.goals ?? currentUser?.goals),
+		schedule: (local?.schedule ?? currentUser?.schedule) || '',
+		equipment: toArray(local?.equipment ?? currentUser?.equipment),
+		experience_level: (local?.experience_level ?? currentUser?.experience_level) || '',
+		onboarding_completed: !!(local?.onboarding_completed ?? currentUser?.onboarding_completed)
+	};
+}
+
+function prefillOnboardingForm() {
+	const profile = getEffectiveProfile();
+	const form = document.getElementById('onboarding-form');
+	if (!form) return;
+
+	// Goals (first form-group)
+	const formGroups = document.querySelectorAll('#onboarding-form .form-group');
+	if (formGroups[0]) {
+		formGroups[0].querySelectorAll('input[type="checkbox"]').forEach(cb => {
+			cb.checked = profile.goals.includes(cb.value);
+		});
+	}
+
+	// Schedule
+	const scheduleSelect = document.getElementById('schedule');
+	if (scheduleSelect && profile.schedule) {
+		scheduleSelect.value = profile.schedule;
+	}
+
+	// Equipment (third form-group)
+	if (formGroups[2]) {
+		formGroups[2].querySelectorAll('input[type="checkbox"]').forEach(cb => {
+			cb.checked = profile.equipment.includes(cb.value);
+		});
+	}
+
+	// Experience level
+	const expSelect = document.getElementById('experience-level');
+	if (expSelect && profile.experience_level) {
+		expSelect.value = profile.experience_level;
+	}
+}
+
 // Initialize app
 document.addEventListener('DOMContentLoaded', function() {
     // Start at login page, but if user exists and has completed onboarding, skip setup on subsequent logins
     authToken = null;
     try {
         const savedUser = JSON.parse(localStorage.getItem('user') || 'null');
-        if (savedUser && savedUser.onboarding_completed) {
-            currentUser = savedUser;
+        const savedProfile = savedUser ? getLocalUserProfile(savedUser.email) : null;
+        if (savedUser) {
+            // Merge any locally saved profile fields
+            const merged = {
+                ...savedUser,
+                ...(savedProfile ? {
+                    goals: savedUser.goals || JSON.stringify(savedProfile.goals || []),
+                    schedule: savedUser.schedule || savedProfile.schedule,
+                    equipment: savedUser.equipment || JSON.stringify(savedProfile.equipment || []),
+                    experience_level: savedUser.experience_level || savedProfile.experience_level,
+                    onboarding_completed: savedUser.onboarding_completed || !!savedProfile?.onboarding_completed
+                } : {})
+            };
+            currentUser = merged;
+            localStorage.setItem('user', JSON.stringify(currentUser));
+        } else if (savedProfile) {
+            currentUser = {
+                id: 0,
+                email: savedProfile.email || 'demo@local',
+                name: 'Demo User',
+                goals: JSON.stringify(savedProfile.goals || []),
+                schedule: savedProfile.schedule,
+                equipment: JSON.stringify(savedProfile.equipment || []),
+                experience_level: savedProfile.experience_level,
+                onboarding_completed: !!savedProfile.onboarding_completed
+            };
+            localStorage.setItem('user', JSON.stringify(currentUser));
         } else {
             currentUser = null;
         }
@@ -90,22 +193,44 @@ async function handleLogin(e) {
             localStorage.setItem('authToken', authToken);
             localStorage.setItem('user', JSON.stringify(currentUser));
             
-            if (!currentUser.onboarding_completed) {
-                showOnboarding();
-            } else {
-                showApp();
+            // Do not force onboarding; show app and allow Setup Profile button if needed
+            // Merge any stored profile for this email and persist
+            const stored = getLocalUserProfile(currentUser.email);
+            if (stored) {
+                currentUser = {
+                    ...currentUser,
+                    goals: currentUser.goals || JSON.stringify(stored.goals || []),
+                    schedule: currentUser.schedule || stored.schedule,
+                    equipment: currentUser.equipment || JSON.stringify(stored.equipment || []),
+                    experience_level: currentUser.experience_level || stored.experience_level,
+                    onboarding_completed: currentUser.onboarding_completed || !!stored.onboarding_completed
+                };
+                localStorage.setItem('user', JSON.stringify(currentUser));
             }
+            showApp();
             
             showToast('Login successful!', 'success');
         } else {
             if (IS_DEV) {
-                // Development fallback: proceed with a demo user
+                // Dev fallback: prefer profile keyed by the email entered
+                const profiles = getLocalUserProfiles();
+                const attemptedEmail = email || Object.keys(profiles)[0] || 'demo@local';
+                const profile = getLocalUserProfile(attemptedEmail);
                 currentUser = JSON.parse(localStorage.getItem('user') || 'null') || {
                     id: 0,
-                    email: 'demo@local',
+                    email: attemptedEmail,
                     name: 'Demo User',
-                    onboarding_completed: true
+                    onboarding_completed: !!(profile && profile.onboarding_completed)
                 };
+                if (profile) {
+                    currentUser = {
+                        ...currentUser,
+                        goals: JSON.stringify(profile.goals || []),
+                        schedule: profile.schedule,
+                        equipment: JSON.stringify(profile.equipment || []),
+                        experience_level: profile.experience_level
+                    };
+                }
                 authToken = '';
                 localStorage.setItem('user', JSON.stringify(currentUser));
                 showApp();
@@ -116,12 +241,24 @@ async function handleLogin(e) {
         }
     } catch (error) {
         if (IS_DEV) {
+            const profiles = getLocalUserProfiles();
+            const attemptedEmail = document.getElementById('login-email').value || Object.keys(profiles)[0] || 'demo@local';
+            const profile = getLocalUserProfile(attemptedEmail);
             currentUser = JSON.parse(localStorage.getItem('user') || 'null') || {
                 id: 0,
-                email: 'demo@local',
+                email: attemptedEmail,
                 name: 'Demo User',
-                onboarding_completed: true
+                onboarding_completed: !!(profile && profile.onboarding_completed)
             };
+            if (profile) {
+                currentUser = {
+                    ...currentUser,
+                    goals: JSON.stringify(profile.goals || []),
+                    schedule: profile.schedule,
+                    equipment: JSON.stringify(profile.equipment || []),
+                    experience_level: profile.experience_level
+                };
+            }
             authToken = '';
             localStorage.setItem('user', JSON.stringify(currentUser));
             showApp();
@@ -217,13 +354,21 @@ async function handleOnboarding(e) {
         if (response.ok) {
             currentUser = data.user;
             localStorage.setItem('user', JSON.stringify(currentUser));
+            // Also store a compact profile for dev persistence
+            saveLocalUserProfile(currentUser.email, {
+                goals,
+                schedule,
+                equipment,
+                experience_level: experienceLevel,
+                onboarding_completed: true
+            });
             
             showApp();
             showToast('Profile setup complete!', 'success');
         } else {
             // Fallback to local completion in development
             if (IS_DEV) {
-                currentUser = {
+                const profile = {
                     ...currentUser,
                     goals: JSON.stringify(goals),
                     schedule: schedule,
@@ -231,7 +376,15 @@ async function handleOnboarding(e) {
                     experience_level: experienceLevel,
                     onboarding_completed: true
                 };
+                currentUser = profile;
                 localStorage.setItem('user', JSON.stringify(currentUser));
+                saveLocalUserProfile(currentUser.email, {
+                    goals,
+                    schedule,
+                    equipment,
+                    experience_level: experienceLevel,
+                    onboarding_completed: true
+                });
                 showApp();
                 showToast('Profile setup complete! (Saved locally)', 'success');
             } else {
@@ -243,7 +396,7 @@ async function handleOnboarding(e) {
             showToast('Request timed out. The server may not be running.', 'error');
         } else if (error.message.includes('Failed to fetch')) {
             if (IS_DEV) {
-                currentUser = {
+                const profile = {
                     ...currentUser,
                     goals: JSON.stringify(goals),
                     schedule: schedule,
@@ -251,7 +404,15 @@ async function handleOnboarding(e) {
                     experience_level: experienceLevel,
                     onboarding_completed: true
                 };
+                currentUser = profile;
                 localStorage.setItem('user', JSON.stringify(currentUser));
+                saveLocalUserProfile(currentUser.email, {
+                    goals,
+                    schedule,
+                    equipment,
+                    experience_level: experienceLevel,
+                    onboarding_completed: true
+                });
                 showApp();
                 showToast('Profile setup complete! (Saved locally)', 'success');
             } else {
@@ -288,6 +449,8 @@ function showOnboarding() {
     document.getElementById('onboarding-section').style.display = 'block';
     document.getElementById('app-section').style.display = 'none';
     document.getElementById('navbar').style.display = 'none';
+    // Prefill form from saved profile/user
+    try { prefillOnboardingForm(); } catch {}
 }
 
 function showApp() {
@@ -296,6 +459,10 @@ function showApp() {
     document.getElementById('app-section').style.display = 'block';
     document.getElementById('navbar').style.display = 'block';
     
+    // Toggle Setup Profile button based on onboarding completion
+    const setupBtn = document.getElementById('setup-profile-btn');
+    if (setupBtn) setupBtn.style.display = 'inline-block';
+
     showDashboard();
     loadDashboardData();
 }
