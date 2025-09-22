@@ -25,9 +25,18 @@ function saveLocalWorkoutHistory(history) {
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', function() {
-    // Start at login page but keep local workout history for dev persistence
+    // Start at login page, but if user exists and has completed onboarding, skip setup on subsequent logins
     authToken = null;
-    currentUser = null;
+    try {
+        const savedUser = JSON.parse(localStorage.getItem('user') || 'null');
+        if (savedUser && savedUser.onboarding_completed) {
+            currentUser = savedUser;
+        } else {
+            currentUser = null;
+        }
+    } catch {
+        currentUser = null;
+    }
     showAuth();
     
     // Set up form handlers
@@ -181,39 +190,6 @@ async function handleOnboarding(e) {
                            .map(cb => cb.value);
     const experienceLevel = document.getElementById('experience-level').value;
     
-    // Check if we're in development mode without backend
-    const isDevelopment = true; // Set to false when backend is working
-    
-    if (isDevelopment) {
-        // Mock the backend response for development
-        setTimeout(() => {
-            // Update the current user with onboarding data
-            currentUser = {
-                ...currentUser,
-                goals: JSON.stringify(goals),
-                schedule: schedule,
-                equipment: JSON.stringify(equipment),
-                experience_level: experienceLevel,
-                onboarding_completed: true
-            };
-            
-            localStorage.setItem('user', JSON.stringify(currentUser));
-            
-            hideLoading();
-            showApp();
-            showToast('Profile setup complete! (Development Mode)', 'success');
-            
-            console.log('Onboarding data saved:', {
-                goals,
-                schedule,
-                equipment,
-                experienceLevel
-            });
-        }, 1000); // Simulate network delay
-        
-        return;
-    }
-    
     try {
         // Add timeout to prevent infinite loading
         const controller = new AbortController();
@@ -245,13 +221,42 @@ async function handleOnboarding(e) {
             showApp();
             showToast('Profile setup complete!', 'success');
         } else {
-            showToast(data.error || 'Setup failed', 'error');
+            // Fallback to local completion in development
+            if (IS_DEV) {
+                currentUser = {
+                    ...currentUser,
+                    goals: JSON.stringify(goals),
+                    schedule: schedule,
+                    equipment: JSON.stringify(equipment),
+                    experience_level: experienceLevel,
+                    onboarding_completed: true
+                };
+                localStorage.setItem('user', JSON.stringify(currentUser));
+                showApp();
+                showToast('Profile setup complete! (Saved locally)', 'success');
+            } else {
+                showToast(data.error || 'Setup failed', 'error');
+            }
         }
     } catch (error) {
         if (error.name === 'AbortError') {
             showToast('Request timed out. The server may not be running.', 'error');
         } else if (error.message.includes('Failed to fetch')) {
-            showToast('Cannot connect to server. Please ensure the backend is running on port 5000.', 'error');
+            if (IS_DEV) {
+                currentUser = {
+                    ...currentUser,
+                    goals: JSON.stringify(goals),
+                    schedule: schedule,
+                    equipment: JSON.stringify(equipment),
+                    experience_level: experienceLevel,
+                    onboarding_completed: true
+                };
+                localStorage.setItem('user', JSON.stringify(currentUser));
+                showApp();
+                showToast('Profile setup complete! (Saved locally)', 'success');
+            } else {
+                showToast('Cannot connect to server. Please ensure the backend is running on port 5000.', 'error');
+            }
         } else {
             showToast('Network error. Please try again.', 'error');
         }
