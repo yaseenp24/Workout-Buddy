@@ -137,15 +137,58 @@ async function handleOnboarding(e) {
     e.preventDefault();
     showLoading();
     
-    const goals = Array.from(document.querySelectorAll('#onboarding-form input[type="checkbox"]:checked'))
+    // Get all form groups
+    const formGroups = document.querySelectorAll('#onboarding-form .form-group');
+    
+    // Goals are in the first form group
+    const goals = Array.from(formGroups[0].querySelectorAll('input[type="checkbox"]:checked'))
                       .map(cb => cb.value);
+    
     const schedule = document.getElementById('schedule').value;
-    const equipment = Array.from(document.querySelectorAll('#onboarding-form input[value]:checked'))
-                           .filter(cb => cb.name !== 'goals')
+    
+    // Equipment is in the third form group (index 2)
+    const equipment = Array.from(formGroups[2].querySelectorAll('input[type="checkbox"]:checked'))
                            .map(cb => cb.value);
     const experienceLevel = document.getElementById('experience-level').value;
     
+    // Check if we're in development mode without backend
+    const isDevelopment = true; // Set to false when backend is working
+    
+    if (isDevelopment) {
+        // Mock the backend response for development
+        setTimeout(() => {
+            // Update the current user with onboarding data
+            currentUser = {
+                ...currentUser,
+                goals: JSON.stringify(goals),
+                schedule: schedule,
+                equipment: JSON.stringify(equipment),
+                experience_level: experienceLevel,
+                onboarding_completed: true
+            };
+            
+            localStorage.setItem('user', JSON.stringify(currentUser));
+            
+            hideLoading();
+            showApp();
+            showToast('Profile setup complete! (Development Mode)', 'success');
+            
+            console.log('Onboarding data saved:', {
+                goals,
+                schedule,
+                equipment,
+                experienceLevel
+            });
+        }, 1000); // Simulate network delay
+        
+        return;
+    }
+    
     try {
+        // Add timeout to prevent infinite loading
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        
         const response = await fetch(`${API_BASE}/user/onboarding`, {
             method: 'PUT',
             headers: {
@@ -157,8 +200,11 @@ async function handleOnboarding(e) {
                 schedule,
                 equipment,
                 experience_level: experienceLevel
-            })
+            }),
+            signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
         
         const data = await response.json();
         
@@ -172,7 +218,14 @@ async function handleOnboarding(e) {
             showToast(data.error || 'Setup failed', 'error');
         }
     } catch (error) {
-        showToast('Network error. Please try again.', 'error');
+        if (error.name === 'AbortError') {
+            showToast('Request timed out. The server may not be running.', 'error');
+        } else if (error.message.includes('Failed to fetch')) {
+            showToast('Cannot connect to server. Please ensure the backend is running on port 5000.', 'error');
+        } else {
+            showToast('Network error. Please try again.', 'error');
+        }
+        console.error('Onboarding error:', error);
     }
     
     hideLoading();
