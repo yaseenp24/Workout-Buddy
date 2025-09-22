@@ -591,6 +591,7 @@ async function loadWorkoutTemplates() {
                 }
             ];
             displayWorkoutTemplates(mockTemplates);
+            hideLoading();
             return;
         }
 
@@ -619,6 +620,7 @@ async function loadWorkoutTemplates() {
                     }
                 ];
                 displayWorkoutTemplates(fallbackTemplates);
+                hideLoading();
             } else {
                 showToast('Failed to load templates', 'error');
             }
@@ -639,6 +641,7 @@ async function loadWorkoutTemplates() {
                 }
             ];
             displayWorkoutTemplates(offlineTemplates);
+            hideLoading();
         } else {
             showToast('Network error loading templates', 'error');
         }
