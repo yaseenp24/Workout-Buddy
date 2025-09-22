@@ -4,6 +4,13 @@ from flask_jwt_extended import JWTManager, jwt_required, create_access_token, ge
 from models import db, User, Exercise, WorkoutTemplate, TemplateExercise, WorkoutLog, SetLog
 import json
 from datetime import datetime, timedelta 
+import os
+
+try:
+    import google.generativeai as genai
+    _HAS_GEMINI = True
+except Exception:
+    _HAS_GEMINI = False 
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///fitness_tracker.db'
@@ -324,6 +331,96 @@ def seed_data():
     
     db.session.commit()
     print("Database seeded successfully!")
+
+# --------- AI: Profile Tips ---------
+def _profile_to_prompt(profile: dict) -> str:
+    goals = ", ".join(profile.get('goals', [])) or "unspecified goals"
+    equipment = ", ".join(profile.get('equipment', [])) or "no equipment"
+    schedule = profile.get('schedule') or "unspecified schedule"
+    experience = profile.get('experience_level') or "unspecified experience"
+    return (
+        f"User profile:\n"
+        f"- Goals: {goals}\n"
+        f"- Schedule: {schedule}\n"
+        f"- Equipment: {equipment}\n"
+        f"- Experience: {experience}\n\n"
+        f"Provide 5 concise, actionable training tips tailored to the user."
+        f" Focus on exercise selection, progression, recovery, and adherence."
+        f" Use bullet points, 1 sentence each."
+    )
+
+def _local_tips(profile: dict):
+    tips = []
+    goals = set(profile.get('goals', []))
+    equipment = set(profile.get('equipment', []))
+    schedule = (profile.get('schedule') or '').lower()
+    experience = (profile.get('experience_level') or '').lower()
+
+    if 'muscle_gain' in goals or 'strength' in goals:
+        tips.append("Prioritize compound lifts and add small weekly load or rep increases.")
+    if 'weight_loss' in goals:
+        tips.append("Keep rests short and add brisk walks on non-training days to raise weekly activity.")
+    if 'endurance' in goals:
+        tips.append("Include 1–2 zone-2 cardio sessions weekly alongside resistance training.")
+    if 'cable_machine' in equipment:
+        tips.append("Use cable moves to keep tension constant for accessories like rows and face pulls.")
+    if 'bodyweight_only' in equipment and not equipment - {'bodyweight_only'}:
+        tips.append("Use slow eccentrics and pause reps to make bodyweight sessions more effective.")
+    if '3-4' in schedule or '3-4 days' in schedule:
+        tips.append("Run a simple upper/lower split across two alternating days each week.")
+    if experience in ('beginner', '0-1 years'):
+        tips.append("Repeat the same key lifts to build skill; keep RPE ~7–8 and track every session.")
+    if not tips:
+        tips = [
+            "Aim for 8–12 hard sets per muscle per week and log all sessions.",
+            "Warm up with lighter sets, then keep working sets within 2–3 reps of failure.",
+            "Progress either weight or reps each week on your main lifts.",
+            "Sleep 7–9 hours and keep protein ~1.6–2.2 g/kg bodyweight.",
+            "Deload 1 week every 6–8 weeks or when fatigue accumulates."
+        ]
+    return tips[:5]
+
+@app.route('/api/ai/profile-tips', methods=['POST'])
+def profile_tips():
+    try:
+        data = request.get_json() or {}
+        # Allow auth-based fetch if token present
+        if not data.get('profile') and request.headers.get('Authorization'):
+            try:
+                user_id = get_jwt_identity()
+                if user_id:
+                    user = User.query.get(user_id)
+                    if user:
+                        data['profile'] = {
+                            'goals': json.loads(user.goals) if user.goals else [],
+                            'schedule': user.schedule,
+                            'equipment': json.loads(user.equipment) if user.equipment else [],
+                            'experience_level': user.experience_level
+                        }
+            except Exception:
+                pass
+
+        profile = data.get('profile') or {}
+
+        # If Gemini configured, call it
+        if _HAS_GEMINI and os.getenv('GOOGLE_API_KEY'):
+            try:
+                genai.configure(api_key=os.getenv('GOOGLE_API_KEY'))
+                model = genai.GenerativeModel('gemini-1.5-flash')
+                prompt = _profile_to_prompt(profile)
+                resp = model.generate_content(prompt)
+                text = (resp.text or '').strip()
+                # Return as lines
+                tips = [line.lstrip('-• ').strip() for line in text.split('\n') if line.strip()][:5]
+                if tips:
+                    return jsonify({'tips': tips}), 200
+            except Exception:
+                pass
+
+        # Fallback local tips
+        return jsonify({'tips': _local_tips(profile)}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     with app.app_context():
