@@ -10,15 +10,24 @@ const API_BASE = 'http://localhost:5000/api';
 // Development flag to enable frontend-only fallbacks when backend is unavailable
 const IS_DEV = true;
 
+// Local storage helpers (development fallback)
+function getLocalWorkoutHistory() {
+	try {
+		return JSON.parse(localStorage.getItem('workoutHistory') || '[]');
+	} catch (e) {
+		return [];
+	}
+}
+
+function saveLocalWorkoutHistory(history) {
+	localStorage.setItem('workoutHistory', JSON.stringify(history));
+}
+
 // Initialize app
 document.addEventListener('DOMContentLoaded', function() {
-    // Always clear previous session and start fresh
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('user');
+    // Start at login page but keep local workout history for dev persistence
     authToken = null;
     currentUser = null;
-    
-    // Always show login page on startup
     showAuth();
     
     // Set up form handlers
@@ -80,10 +89,37 @@ async function handleLogin(e) {
             
             showToast('Login successful!', 'success');
         } else {
-            showToast(data.error || 'Login failed', 'error');
+            if (IS_DEV) {
+                // Development fallback: proceed with a demo user
+                currentUser = JSON.parse(localStorage.getItem('user') || 'null') || {
+                    id: 0,
+                    email: 'demo@local',
+                    name: 'Demo User',
+                    onboarding_completed: true
+                };
+                authToken = '';
+                localStorage.setItem('user', JSON.stringify(currentUser));
+                showApp();
+                showToast('Logged in (Development Mode)', 'success');
+            } else {
+                showToast(data.error || 'Login failed', 'error');
+            }
         }
     } catch (error) {
-        showToast('Network error. Please try again.', 'error');
+        if (IS_DEV) {
+            currentUser = JSON.parse(localStorage.getItem('user') || 'null') || {
+                id: 0,
+                email: 'demo@local',
+                name: 'Demo User',
+                onboarding_completed: true
+            };
+            authToken = '';
+            localStorage.setItem('user', JSON.stringify(currentUser));
+            showApp();
+            showToast('Logged in (Development Mode)', 'success');
+        } else {
+            showToast('Network error. Please try again.', 'error');
+        }
     }
     
     hideLoading();
@@ -284,6 +320,11 @@ function showWorkoutHistory() {
 // Dashboard functions
 async function loadDashboardData() {
     try {
+        // In development, always use locally saved workouts for dashboard stats
+        if (IS_DEV) {
+            updateDashboardStats(getLocalWorkoutHistory());
+            return;
+        }
         const response = await fetch(`${API_BASE}/workouts/history?per_page=100`, {
             headers: {
                 'Authorization': `Bearer ${authToken}`
@@ -340,6 +381,7 @@ async function loadWorkoutTemplates() {
             const mockTemplates = [
                 {
                     id: 1,
+                    isMock: true,
                     name: 'Push/Pull/Legs',
                     description: 'A 3-day split focusing on push, pull and legs',
                     exercises: [
@@ -351,6 +393,7 @@ async function loadWorkoutTemplates() {
                 },
                 {
                     id: 2,
+                    isMock: true,
                     name: 'Upper/Lower',
                     description: 'A 2-day split alternating upper and lower body',
                     exercises: [
@@ -379,6 +422,7 @@ async function loadWorkoutTemplates() {
                 const fallbackTemplates = [
                     {
                         id: 3,
+                        isMock: true,
                         name: 'Full Body Beginner',
                         description: 'Simple full-body routine to get started',
                         exercises: [
@@ -398,6 +442,7 @@ async function loadWorkoutTemplates() {
             const offlineTemplates = [
                 {
                     id: 4,
+                    isMock: true,
                     name: 'At-Home No Equipment',
                     description: 'Bodyweight-only routine for home',
                     exercises: [
@@ -545,6 +590,38 @@ async function finishWorkout() {
     
     const duration = Math.floor((Date.now() - workoutStartTime) / 60000); // minutes
     
+    // Dev fallback: save locally when backend/auth not available
+    if (IS_DEV && (!authToken || authToken === '' || (currentWorkout.template && currentWorkout.template.isMock))) {
+        const workout = {
+            id: Date.now(),
+            template: currentWorkout.template,
+            date: new Date().toISOString(),
+            duration_minutes: duration,
+            notes: '',
+            sets: currentWorkout.sets.map(s => {
+                const match = (currentWorkout.template.exercises || []).find(te => te.exercise && te.exercise.id === s.exercise_id);
+                return {
+                    ...s,
+                    exercise: match ? match.exercise : { id: s.exercise_id, name: 'Exercise' }
+                };
+            })
+        };
+        const history = getLocalWorkoutHistory();
+        history.unshift(workout);
+        saveLocalWorkoutHistory(history);
+        
+        showToast('Workout completed successfully! (Saved locally)', 'success');
+        currentWorkout = null;
+        if (workoutTimer) {
+            clearInterval(workoutTimer);
+            workoutTimer = null;
+        }
+        showDashboard();
+        updateDashboardStats(history);
+        hideLoading();
+        return;
+    }
+
     try {
         const response = await fetch(`${API_BASE}/workouts/log`, {
             method: 'POST',
@@ -585,6 +662,12 @@ async function loadWorkoutHistory() {
     showLoading();
     
     try {
+        // In development, always load history from local storage
+        if (IS_DEV) {
+            displayWorkoutHistory(getLocalWorkoutHistory());
+            hideLoading();
+            return;
+        }
         const response = await fetch(`${API_BASE}/workouts/history`, {
             headers: {
                 'Authorization': `Bearer ${authToken}`
