@@ -7,25 +7,19 @@ let workoutStartTime = null;
 
 // API base URL
 const API_BASE = 'http://localhost:5000/api';
+// Development flag to enable frontend-only fallbacks when backend is unavailable
+const IS_DEV = true;
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', function() {
-    // Check if user is already logged in
-    const token = localStorage.getItem('authToken');
-    const user = localStorage.getItem('user');
+    // Always clear previous session and start fresh
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+    authToken = null;
+    currentUser = null;
     
-    if (token && user) {
-        authToken = token;
-        currentUser = JSON.parse(user);
-        
-        if (!currentUser.onboarding_completed) {
-            showOnboarding();
-        } else {
-            showApp();
-        }
-    } else {
-        showAuth();
-    }
+    // Always show login page on startup
+    showAuth();
     
     // Set up form handlers
     setupEventListeners();
@@ -341,6 +335,36 @@ async function loadWorkoutTemplates() {
     showLoading();
     
     try {
+        // Frontend-only fallback in development
+        if (IS_DEV && !authToken) {
+            const mockTemplates = [
+                {
+                    id: 1,
+                    name: 'Push/Pull/Legs',
+                    description: 'A 3-day split focusing on push, pull and legs',
+                    exercises: [
+                        { exercise: { id: 101, name: 'Bench Press' }, sets: 4, reps_range: '6-8', order: 1 },
+                        { exercise: { id: 102, name: 'Overhead Press' }, sets: 3, reps_range: '8-10', order: 2 },
+                        { exercise: { id: 103, name: 'Incline Dumbbell Press' }, sets: 3, reps_range: '10-12', order: 3 },
+                        { exercise: { id: 104, name: 'Dips' }, sets: 3, reps_range: '12-15', order: 4 }
+                    ]
+                },
+                {
+                    id: 2,
+                    name: 'Upper/Lower',
+                    description: 'A 2-day split alternating upper and lower body',
+                    exercises: [
+                        { exercise: { id: 201, name: 'Barbell Rows' }, sets: 4, reps_range: '6-8', order: 1 },
+                        { exercise: { id: 202, name: 'Pull-ups' }, sets: 3, reps_range: '8-12', order: 2 },
+                        { exercise: { id: 203, name: 'Squats' }, sets: 4, reps_range: '5-8', order: 3 },
+                        { exercise: { id: 204, name: 'Romanian Deadlifts' }, sets: 3, reps_range: '6-10', order: 4 }
+                    ]
+                }
+            ];
+            displayWorkoutTemplates(mockTemplates);
+            return;
+        }
+
         const response = await fetch(`${API_BASE}/workouts/templates`, {
             headers: {
                 'Authorization': `Bearer ${authToken}`
@@ -351,10 +375,42 @@ async function loadWorkoutTemplates() {
             const data = await response.json();
             displayWorkoutTemplates(data.templates);
         } else {
-            showToast('Failed to load templates', 'error');
+            if (IS_DEV) {
+                const fallbackTemplates = [
+                    {
+                        id: 3,
+                        name: 'Full Body Beginner',
+                        description: 'Simple full-body routine to get started',
+                        exercises: [
+                            { exercise: { id: 301, name: 'Goblet Squat' }, sets: 3, reps_range: '8-12', order: 1 },
+                            { exercise: { id: 302, name: 'Push-ups' }, sets: 3, reps_range: '8-15', order: 2 },
+                            { exercise: { id: 303, name: 'Bent-over Row' }, sets: 3, reps_range: '8-12', order: 3 }
+                        ]
+                    }
+                ];
+                displayWorkoutTemplates(fallbackTemplates);
+            } else {
+                showToast('Failed to load templates', 'error');
+            }
         }
     } catch (error) {
-        showToast('Network error loading templates', 'error');
+        if (IS_DEV) {
+            const offlineTemplates = [
+                {
+                    id: 4,
+                    name: 'At-Home No Equipment',
+                    description: 'Bodyweight-only routine for home',
+                    exercises: [
+                        { exercise: { id: 401, name: 'Bodyweight Squat' }, sets: 3, reps_range: '12-20', order: 1 },
+                        { exercise: { id: 402, name: 'Push-ups' }, sets: 3, reps_range: '8-20', order: 2 },
+                        { exercise: { id: 403, name: 'Plank' }, sets: 3, reps_range: '30-60s', order: 3 }
+                    ]
+                }
+            ];
+            displayWorkoutTemplates(offlineTemplates);
+        } else {
+            showToast('Network error loading templates', 'error');
+        }
     }
     
     hideLoading();
