@@ -1,0 +1,12 @@
+{
+  "name": "fitness-tracker-frontend",
+  "version": "1.0.0",
+  "description": "Frontend for fitness tracking app",
+  "main": "index.js",
+  "scripts": {
+    "start": "python -m http.server 8080",
+    "dev": "python -m http.server 8080"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fitness Tracker</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar" id="navbar" style="display: none;">
+        <div class="nav-container">
+            <h1 class="nav-title">Fitness Tracker</h1>
+            <div class="nav-links">
+                <button class="nav-btn" onclick="showDashboard()">Dashboard</button>
+                <button class="nav-btn" onclick="showWorkoutTemplates()">Templates</button>
+                <button class="nav-btn" onclick="showWorkoutHistory()">History</button>
+                <button class="nav-btn" onclick="logout()">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Authentication Section -->
+    <div id="auth-section" class="auth-container">
+        <div class="auth-form">
+            <h1>Fitness Tracker</h1>
+            <div class="auth-tabs">
+                <button class="tab-btn active" onclick="showLogin()">Login</button>
+                <button class="tab-btn" onclick="showRegister()">Register</button>
+            </div>
+
+            <!-- Login Form -->
+            <form id="login-form" class="form-container">
+                <h2>Welcome Back</h2>
+                <input type="email" id="login-email" placeholder="Email" required>
+                <input type="password" id="login-password" placeholder="Password" required>
+                <button type="submit" class="btn-primary">Login</button>
+            </form>
+
+            <!-- Register Form -->
+            <form id="register-form" class="form-container" style="display: none;">
+                <h2>Create Account</h2>
+                <input type="text" id="register-name" placeholder="Full Name" required>
+                <input type="email" id="register-email" placeholder="Email" required>
+                <input type="password" id="register-password" placeholder="Password" required>
+                <button type="submit" class="btn-primary">Register</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Onboarding Section -->
+    <div id="onboarding-section" class="container" style="display: none;">
+        <div class="onboarding-form">
+            <h2>Let's Set Up Your Profile</h2>
+            <form id="onboarding-form">
+                <div class="form-group">
+                    <label>What are your fitness goals?</label>
+                    <div class="checkbox-group">
+                        <label><input type="checkbox" value="weight_loss"> Weight Loss</label>
+                        <label><input type="checkbox" value="muscle_gain"> Muscle Gain</label>
+                        <label><input type="checkbox" value="strength"> Strength Building</label>
+                        <label><input type="checkbox" value="endurance"> Endurance</label>
+                        <label><input type="checkbox" value="general_fitness"> General Fitness</label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>How often can you work out?</label>
+                    <select id="schedule" required>
+                        <option value="">Select schedule</option>
+                        <option value="2-3 days/week">2-3 days per week</option>
+                        <option value="3-4 days/week">3-4 days per week</option>
+                        <option value="4-5 days/week">4-5 days per week</option>
+                        <option value="5-6 days/week">5-6 days per week</option>
+                        <option value="daily">Daily</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>What equipment do you have access to?</label>
+                    <div class="checkbox-group">
+                        <label><input type="checkbox" value="barbell"> Barbell</label>
+                        <label><input type="checkbox" value="dumbbells"> Dumbbells</label>
+                        <label><input type="checkbox" value="bench"> Bench</label>
+                        <label><input type="checkbox" value="pull_up_bar"> Pull-up Bar</label>
+                        <label><input type="checkbox" value="cable_machine"> Cable Machine</label>
+                        <label><input type="checkbox" value="leg_press_machine"> Leg Press Machine</label>
+                        <label><input type="checkbox" value="bodyweight_only"> Bodyweight Only</label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Experience Level</label>
+                    <select id="experience-level" required>
+                        <option value="">Select level</option>
+                        <option value="beginner">Beginner (0-1 years)</option>
+                        <option value="intermediate">Intermediate (1-3 years)</option>
+                        <option value="advanced">Advanced (3+ years)</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="btn-primary">Complete Setup</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main App Section -->
+    <div id="app-section" class="container" style="display: none;">
+        
+        <!-- Dashboard -->
+        <div id="dashboard" class="section">
+            <h2>Dashboard</h2>
+            <div class="dashboard-stats">
+                <div class="stat-card">
+                    <h3>Total Workouts</h3>
+                    <p id="total-workouts">0</p>
+                </div>
+                <div class="stat-card">
+                    <h3>This Week</h3>
+                    <p id="week-workouts">0</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Current Streak</h3>
+                    <p id="workout-streak">0 days</p>
+                </div>
+            </div>
+            <div class="quick-actions">
+                <button class="btn-primary" onclick="showWorkoutTemplates()">Start Workout</button>
+                <button class="btn-secondary" onclick="showWorkoutHistory()">View History</button>
+            </div>
+        </div>
+
+        <!-- Workout Templates -->
+        <div id="workout-templates" class="section" style="display: none;">
+            <h2>Choose a Workout</h2>
+            <div id="templates-list" class="templates-grid">
+                <!-- Templates will be loaded here -->
+            </div>
+        </div>
+
+        <!-- Workout Logging -->
+        <div id="workout-logging" class="section" style="display: none;">
+            <div class="workout-header">
+                <h2 id="current-workout-name">Workout</h2>
+                <div class="workout-timer">
+                    <span id="workout-timer">00:00</span>
+                </div>
+            </div>
+            
+            <div id="workout-exercises">
+                <!-- Exercise logging will be populated here -->
+            </div>
+            
+            <div class="workout-actions">
+                <button class="btn-secondary" onclick="cancelWorkout()">Cancel</button>
+                <button class="btn-primary" onclick="finishWorkout()">Finish Workout</button>
+            </div>
+        </div>
+
+        <!-- Workout History -->
+        <div id="workout-history" class="section" style="display: none;">
+            <h2>Workout History</h2>
+            <div id="history-list">
+                <!-- History will be loaded here -->
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay" style="display: none;">
+        <div class="loading-spinner"></div>
+    </div>
+
+    <!-- Toast Messages -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
