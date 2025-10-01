@@ -181,7 +181,7 @@ def log_workout():
                 weight=set_data.get('weight'),
                 reps=set_data['reps'],
                 rpe=set_data.get('rpe')
-            )
+            ) 
             db.session.add(set_log)
         
         db.session.commit()
