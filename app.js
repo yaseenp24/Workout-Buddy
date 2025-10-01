@@ -37,7 +37,7 @@ function saveLocalWorkoutHistory(email, history) {
 	saveLocalWorkoutHistoryMap(map);
 }
 
-// Profile persistence helpers (per-account, keyed by email)
+// Profile persistence helpers -> (per-account, keyed by email)
 function getLocalUserProfiles() {
 	try {
 		return JSON.parse(localStorage.getItem('userProfiles') || '{}');
