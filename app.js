@@ -10,7 +10,7 @@ let workoutStartTime = null;
 const API_BASE = 'https://8nae3cfj3h.us-west-2.awsapprunner.com/api';
 // const API_BASE = 'http://localhost:5000/api';
 // Development flag to enable frontend-only fallbacks when backend is unavailable
-const IS_DEV = true;
+const IS_DEV = true; 
 
 // Local storage helpers (development fallback, per-account)
 function getLocalWorkoutHistoryMap() {
