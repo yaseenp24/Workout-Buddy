@@ -153,7 +153,7 @@ def get_exercises():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# Workout Logging Routes
+# Workout Logging Routes for the system
 @app.route('/api/workouts/log', methods=['POST'])
 @jwt_required()
 def log_workout():
