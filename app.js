@@ -5,7 +5,7 @@ let authToken = null;
 let currentWorkout = null;
 let workoutTimer = null;
 let workoutStartTime = null;
-
+ 
 // API base URL
 const API_BASE = 'https://8nae3cfj3h.us-west-2.awsapprunner.com/api';
 // const API_BASE = 'http://localhost:5000/api';
