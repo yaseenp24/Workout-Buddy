@@ -5,7 +5,7 @@ from models import db, User, Exercise, WorkoutTemplate, TemplateExercise, Workou
 import json
 from datetime import datetime, timedelta 
 import os
-
+ 
 try:
     import google.generativeai as genai
     _HAS_GEMINI = True
