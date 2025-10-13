@@ -1,4 +1,4 @@
-// Global state:
+// Global state
 // Can be accessed throughout entire program
 let currentUser = null;
 let authToken = null;
