@@ -22,7 +22,7 @@ def check_dependencies():
         print(f"✗ Missing dependency: {e}")
         print("Please run: pip install -r requirements.txt")
         return False
-
+ 
 def start_backend():
     """Start the Flask backend server"""
     try:
