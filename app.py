@@ -11,7 +11,7 @@ try:
     _HAS_GEMINI = True
 except Exception:
     _HAS_GEMINI = False 
-
+ 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///fitness_tracker.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
