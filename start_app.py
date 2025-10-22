@@ -9,7 +9,7 @@ import webbrowser
 from pathlib import Path
 
 def check_dependencies():
-    """Check if required Python packages are installed"""
+    """Check if required Python packages are installed, if so then proceed"""
     try:
         import flask
         import flask_cors
